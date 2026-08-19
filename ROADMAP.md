@@ -25,70 +25,89 @@ Priorities:
 - **Medium** — important operational capability after the core is working.
 - **Low** — useful enhancement that is not currently essential.
 
-## Proposed architecture and administration work
+## Agreed MVP
+
+The first deployment will remain backend-only. It will not include an
+administrator dashboard, user accounts, or a database-backed API-key registry.
+
+Public HTTP requests will follow this path:
+
+```text
+MCP client -> HTTPS endpoint -> bearer-key middleware -> FastMCP server
+```
+
+The container will load the shared key at startup from `MCP_API_KEY_CURRENT`.
+An optional `MCP_API_KEY_PREVIOUS` will support a short, zero-downtime client
+migration window during key rotation. Changing either value requires a service
+restart.
+
+Local `stdio` transport will remain available for trusted local use and will
+not pass through HTTP authentication middleware.
+
+## Improvement backlog
 
 | Improvement | Priority | Status | Dependencies | Branch / PR |
 | --- | --- | --- | --- | --- |
-| Define the deployment and admin architecture | High | Proposed | None | — |
-| Design API-key storage and lifecycle | High | Proposed | Architecture decision | — |
-| Add API-key authentication middleware for HTTP transport | High | Proposed | API-key storage | — |
-| Add separate administrator authentication | High | Proposed | Architecture decision | — |
-| Add API-key management endpoints | High | Proposed | API-key storage; administrator authentication | — |
-| Build an administrator dashboard | High | Proposed | Administrator authentication; management endpoints | — |
-| Add request and audit logging | Medium | Proposed | Architecture decision; persistence | — |
-| Add per-key rate limiting | Medium | Proposed | Authentication middleware; API-key storage | — |
-| Add security, integration, and end-to-end tests | High | Proposed | Implemented authentication components | — |
-| Add public-deployment and administration documentation | Medium | Proposed | Finalized deployment design | — |
+| Document the backend-only deployment architecture | High | Approved | None | — |
+| Add environment-managed bearer-key configuration | High | Approved | None | — |
+| Add bearer-key middleware for HTTP transport | High | Approved | Key configuration | — |
+| Add authentication and transport tests | High | Approved | Authentication middleware | — |
+| Containerize the FastMCP service | High | Approved | Authentication configuration | — |
+| Add container deployment and key-rotation documentation | High | Approved | Containerization | — |
+| Add structured security-event logging | Medium | Proposed | Authentication middleware | — |
+| Add configurable rate limiting | Medium | Deferred | Authentication middleware | — |
+| Add database-backed, per-client API keys | Low | Deferred | Demonstrated multi-client need | — |
+| Add API-key management endpoints | Low | Deferred | Database-backed keys | — |
+| Add administrator authentication and dashboard | Low | Deferred | Management endpoints; demonstrated operational need | — |
 
 ## Scope notes
 
-### Deployment and admin architecture
+### Backend-only deployment architecture
 
-Decide and document:
+The initial deployment will run the Python FastMCP service without a frontend
+or persistence layer. HTTPS should terminate at Cloudflare Tunnel or another
+trusted reverse proxy. The origin service must not be exposed directly to the
+public internet over plaintext HTTP.
 
-- the supported public deployment topology;
-- whether the admin application runs in the same process as the MCP server;
-- the persistence technology and migration strategy;
-- the boundary between public MCP endpoints and admin endpoints;
-- how local `stdio` operation differs from protected HTTP operation; and
-- the configuration and secret-management model.
+The container deployment should use a non-root user, include a health check,
+avoid writing secrets into the image, and document which endpoint—if any—is
+intentionally allowed without authentication for health monitoring.
 
-### API-key storage and lifecycle
+### Startup-managed bearer keys
 
-Define the key format and support secure creation, hashing, lookup, naming,
-expiration, rotation, and revocation. Raw API keys should only be displayed at
-creation time and should not be stored in plaintext.
+Require a high-entropy secret of at least 32 random bytes through
+`MCP_API_KEY_CURRENT`. Accept `MCP_API_KEY_PREVIOUS` only as an optional
+rotation aid. Compare presented keys using a constant-time comparison and
+never log either configured or presented values.
+
+Production deployments should inject secrets through a Docker secret or a
+protected environment file. Secret files and local `.env` files must remain
+outside version control.
 
 ### HTTP authentication middleware
 
-Protect public HTTP MCP requests at a central gateway before they reach MCP
-tools. The middleware should reject missing, invalid, expired, or revoked keys
-consistently. Local `stdio` transport is outside this middleware path and needs
-a separately documented trust model.
+Protect every MCP HTTP request before it reaches FastMCP tools, including
+streaming and session-related routes. Accept credentials only through the
+`Authorization: Bearer <key>` header. Missing, malformed, and incorrect
+credentials should receive the same generic `401 Unauthorized` response.
 
-### Administrator authentication
+Local `stdio` transport is outside this middleware path and should remain
+unaffected.
 
-Keep administrator login separate from client API-key authentication. Define
-secure session handling, credential storage, logout, and protection against
-common web attacks before building the dashboard.
+### Tests and documentation
 
-### API-key management endpoints
+Test successful authentication plus missing, malformed, and incorrect
+credentials. Verify that protected requests never reach MCP handlers after an
+authentication failure, secrets are not logged, and `stdio` operation still
+works. Document secret generation, container startup, client configuration,
+rotation, rollback, and recovery.
 
-Provide administrator-only operations to list key metadata, create keys,
-revoke keys, rotate keys, and inspect relevant usage information without
-exposing stored secrets.
+### Deferred management platform
 
-### Administrator dashboard
-
-Build a minimal interface on top of the management endpoints. Initial scope
-should focus on authentication and API-key lifecycle operations rather than a
-general analytics platform.
-
-### Logging and rate limiting
-
-Record security-relevant events without logging credentials or raw API keys.
-Rate limits should be configurable and enforced per key, with predictable error
-responses and enough metadata for administrators to investigate problems.
+Database-backed keys, individual client revocation, expiry, scopes, usage
+tracking, management endpoints, and an administrator dashboard are not part of
+the MVP. Reconsider them only when multiple independently managed clients make
+startup-managed shared keys operationally insufficient.
 
 ## Working process
 
