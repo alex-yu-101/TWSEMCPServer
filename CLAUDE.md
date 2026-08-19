@@ -25,7 +25,13 @@ TWStockMCPServer is a Model Context Protocol (MCP) server for Taiwan stock marke
 | Run tests by category | `python run_tests.py history` (also: `realtime`, `otc`, `taifex`, `institutional`, `e2e`) |
 | Quick test (fail fast) | `python run_tests.py quick` |
 | Tests with coverage | `python run_tests.py cov` (opens HTML report) |
+| Run Ruff diagnostics | `uv run ruff check .` |
+| Run BasedPyright diagnostics | `uv run basedpyright` |
 | Run server directly | `python server.py` (HTTP on port 8000) |
+
+Ruff and BasedPyright currently report baseline findings in existing code. Treat
+them as developer diagnostics: validate changed files and do not broaden a
+feature or documentation change into unrelated repository-wide cleanup.
 
 ## Code Architecture
 
