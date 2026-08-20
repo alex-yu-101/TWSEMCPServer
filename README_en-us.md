@@ -104,6 +104,26 @@ This project is powered by **Prefect Horizon**, which hosts a free remote MCP Se
 }
 ```
 
+### 🐳 Docker (authenticated HTTP)
+
+Generate a random key of at least 32 bytes and save it in the untracked `.env`
+file:
+
+```bash
+printf 'MCP_API_KEY_CURRENT=%s\n' "$(openssl rand -hex 32)" > .env
+docker compose up --build -d
+```
+
+The service binds to `127.0.0.1:8000` by default for use behind Cloudflare
+Tunnel or another HTTPS reverse proxy. Do not expose the origin directly over
+unencrypted HTTP. The MCP endpoint is `http://127.0.0.1:8000/mcp`; clients must
+send `Authorization: Bearer <key>`.
+
+The container runs as a non-root user with a read-only filesystem and a built-in
+health check. Set `PORT` in `.env` to use another port. For a short key-rotation
+window, also set `MCP_API_KEY_PREVIOUS`; remove the old key and restart the
+service after all clients have migrated.
+
 ### 🔧 Local Installation
 ```bash
 git clone https://github.com/twjackysu/TWStockMCPServer.git

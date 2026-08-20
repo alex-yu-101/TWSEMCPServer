@@ -35,7 +35,14 @@ tests/
 *.md
 !README.md
 
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Local orchestration overrides
+compose.override.yaml
+
 # Other
 .DS_Store
 *.log
-

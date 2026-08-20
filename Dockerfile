@@ -1,35 +1,31 @@
-# Use Python 3.13 as base image
+# syntax=docker/dockerfile:1
 FROM python:3.13-slim
 
-# Set working directory
+COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /uvx /bin/
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+
 WORKDIR /app
 
-# Install system dependencies and Node.js
-RUN apt-get update && apt-get install -y \
-    curl \
-    gnupg \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
+RUN groupadd --system app && useradd --system --gid app --home-dir /app app
 
-# Install uv
-RUN pip install --no-cache-dir uv
-
-# Copy project files
 COPY pyproject.toml uv.lock ./
-COPY requirements.txt ./
-COPY server.py ./
-COPY tools/ ./tools/
-COPY utils/ ./utils/
-COPY prompts/ ./prompts/
-COPY staticFiles/ ./staticFiles/
+RUN uv sync --frozen --no-dev --no-install-project
 
-# Install dependencies using uv
-RUN uv sync --frozen
+COPY --chown=app:app server.py ./
+COPY --chown=app:app prompts/ ./prompts/
+COPY --chown=app:app staticFiles/ ./staticFiles/
+COPY --chown=app:app tools/ ./tools/
+COPY --chown=app:app utils/ ./utils/
 
-# Expose port for HTTP transport
+USER app
+
 EXPOSE 8000
 
-# Run MCP server (direct execution to use HTTP config from server.py)
-CMD ["uv", "run", "python", "server.py"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["python", "-c", "import os, socket; socket.create_connection(('127.0.0.1', int(os.getenv('PORT', '8000'))), timeout=3).close()"]
 
+CMD ["/app/.venv/bin/python", "server.py"]
