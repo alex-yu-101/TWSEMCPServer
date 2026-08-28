@@ -103,6 +103,24 @@ openapi.taifex.com.tw 僅提供最新一個交易日，本專案額外串接期�
 }
 ```
 
+### 🐳 Docker 使用（需驗證的 HTTP）
+
+先建立至少 32 bytes 的隨機金鑰，並存入不納入版本控制的 `.env`：
+
+```bash
+printf 'MCP_API_KEY_CURRENT=%s\n' "$(openssl rand -hex 32)" > .env
+docker compose up --build -d
+```
+
+服務預設只綁定本機 `127.0.0.1:8000`，供 Cloudflare Tunnel 或其他 HTTPS
+反向代理連線；請勿直接透過未加密 HTTP 暴露 origin。MCP endpoint 為
+`http://127.0.0.1:8000/mcp`，client 必須傳送
+`Authorization: Bearer <key>`。
+
+容器以 non-root 使用者執行，採唯讀檔案系統並內建 health check。若需更換
+port，可在 `.env` 設定 `PORT`。短暫輪替金鑰時可另外設定
+`MCP_API_KEY_PREVIOUS`，所有 client 完成遷移後應移除舊金鑰並重新啟動服務。
+
 ### 🔧 本地安裝
 ```bash
 git clone https://github.com/twjackysu/TWStockMCPServer.git
@@ -126,4 +144,3 @@ uv sync && uv run fastmcp dev server.py
 
 ## 📄 授權 & 免責聲明
 MIT授權 | 僅供參考，不構成投資建議
-
