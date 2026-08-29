@@ -121,6 +121,11 @@ docker compose up --build -d
 port，可在 `.env` 設定 `PORT`。短暫輪替金鑰時可另外設定
 `MCP_API_KEY_PREVIOUS`，所有 client 完成遷移後應移除舊金鑰並重新啟動服務。
 
+若 MCP endpoint 僅限受信任的私有 container network 使用，可明確設定
+`MCP_HTTP_AUTH_MODE=none` 關閉 HTTP 驗證。預設仍強制驗證；mode 無效，或在
+預設 `required` mode 缺少金鑰時，服務都會拒絕啟動。請勿將未驗證的 MCP port
+發布到 host 或 public network。
+
 ### 🔧 本地安裝
 ```bash
 git clone https://github.com/twjackysu/TWStockMCPServer.git

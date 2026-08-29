@@ -14,6 +14,7 @@ from utils.http_auth import (
     APIKeyAuthConfig,
     APIKeyTokenVerifier,
     HTTPAuthConfigurationError,
+    HTTPAuthMode,
 )
 
 CURRENT_KEY = "current-test-secret"
@@ -113,12 +114,66 @@ def test_http_startup_fails_closed_without_current_key(monkeypatch, current_key)
     assert PREVIOUS_KEY not in str(exc_info.value)
 
 
+@pytest.mark.parametrize("configured_mode", ["none", " NONE "])
+def test_http_startup_allows_explicit_unauthenticated_mode(
+    monkeypatch, caplog, configured_mode
+):
+    run = Mock()
+    monkeypatch.setattr(server.mcp, "run", run)
+    monkeypatch.setattr(
+        server.mcp,
+        "auth",
+        APIKeyTokenVerifier.from_environment({"MCP_API_KEY_CURRENT": CURRENT_KEY}),
+    )
+    monkeypatch.setattr(server.mcp, "_http_auth_configured", False)
+    caplog.set_level(logging.WARNING)
+
+    server.run_server(
+        {
+            "MCP_HTTP_AUTH_MODE": configured_mode,
+            "PORT": "8123",
+        }
+    )
+
+    run.assert_called_once_with(transport="http", host="0.0.0.0", port=8123)
+    assert server.mcp.auth is None
+    assert "HTTP authentication is disabled" in caplog.text
+    assert CURRENT_KEY not in caplog.text
+
+
+def test_explicit_unauthenticated_http_accepts_initialize_without_key():
+    mcp = server.TWSEFastMCP("unauthenticated HTTP test")
+    mcp.configure_http_auth({"MCP_HTTP_AUTH_MODE": "none"})
+
+    with TestClient(mcp.http_app()) as client:
+        response = _initialize(client, None)
+
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize("configured_mode", ["", "optional", "false", "disabled"])
+def test_invalid_http_auth_mode_fails_closed(monkeypatch, configured_mode):
+    run = Mock()
+    monkeypatch.setattr(server.mcp, "run", run)
+
+    with pytest.raises(
+        HTTPAuthConfigurationError, match="MCP_HTTP_AUTH_MODE must be either"
+    ):
+        server.run_server({"MCP_HTTP_AUTH_MODE": configured_mode})
+
+    run.assert_not_called()
+
+
+def test_http_auth_mode_defaults_to_required():
+    assert HTTPAuthMode.from_environment({}) is HTTPAuthMode.REQUIRED
+
+
 @pytest.mark.asyncio
 async def test_http_startup_configures_auth_before_run(monkeypatch):
     run = Mock()
     monkeypatch.setattr(server.mcp, "run", run)
     monkeypatch.setattr(server.mcp, "auth", None)
-    monkeypatch.setattr(server.mcp, "_http_api_key_auth_configured", False)
+    monkeypatch.setattr(server.mcp, "_http_auth_configured", False)
 
     server.run_server(
         {
@@ -139,7 +194,8 @@ async def test_fastmcp_cli_http_startup_cannot_bypass_auth(monkeypatch):
     delegated_run = AsyncMock()
     monkeypatch.setattr(FastMCP, "run_async", delegated_run)
     monkeypatch.setattr(server.mcp, "auth", None)
-    monkeypatch.setattr(server.mcp, "_http_api_key_auth_configured", False)
+    monkeypatch.setattr(server.mcp, "_http_auth_configured", False)
+    monkeypatch.delenv("MCP_HTTP_AUTH_MODE", raising=False)
     monkeypatch.setenv("MCP_API_KEY_CURRENT", CURRENT_KEY)
     monkeypatch.delenv("MCP_API_KEY_PREVIOUS", raising=False)
 
@@ -154,11 +210,35 @@ async def test_fastmcp_cli_http_startup_cannot_bypass_auth(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_fastmcp_cli_http_allows_explicit_unauthenticated_mode(monkeypatch):
+    delegated_run = AsyncMock()
+    monkeypatch.setattr(FastMCP, "run_async", delegated_run)
+    monkeypatch.setattr(
+        server.mcp,
+        "auth",
+        APIKeyTokenVerifier.from_environment({"MCP_API_KEY_CURRENT": CURRENT_KEY}),
+    )
+    monkeypatch.setattr(server.mcp, "_http_auth_configured", False)
+    monkeypatch.setenv("MCP_HTTP_AUTH_MODE", "none")
+    monkeypatch.delenv("MCP_API_KEY_CURRENT", raising=False)
+    monkeypatch.delenv("MCP_API_KEY_PREVIOUS", raising=False)
+
+    await server.mcp.run_async(transport="http", show_banner=False)
+
+    assert server.mcp.auth is None
+    delegated_run.assert_awaited_once_with(
+        transport="http",
+        show_banner=False,
+    )
+
+
+@pytest.mark.asyncio
 async def test_fastmcp_cli_http_startup_fails_without_current_key(monkeypatch):
     delegated_run = AsyncMock()
     monkeypatch.setattr(FastMCP, "run_async", delegated_run)
     monkeypatch.setattr(server.mcp, "auth", None)
-    monkeypatch.setattr(server.mcp, "_http_api_key_auth_configured", False)
+    monkeypatch.setattr(server.mcp, "_http_auth_configured", False)
+    monkeypatch.delenv("MCP_HTTP_AUTH_MODE", raising=False)
     monkeypatch.delenv("MCP_API_KEY_CURRENT", raising=False)
     monkeypatch.delenv("MCP_API_KEY_PREVIOUS", raising=False)
 

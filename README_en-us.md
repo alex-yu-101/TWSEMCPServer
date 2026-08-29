@@ -124,6 +124,12 @@ health check. Set `PORT` in `.env` to use another port. For a short key-rotation
 window, also set `MCP_API_KEY_PREVIOUS`; remove the old key and restart the
 service after all clients have migrated.
 
+For a trusted private container network, HTTP authentication can be disabled
+explicitly with `MCP_HTTP_AUTH_MODE=none`. Authentication remains required by
+default, and an invalid mode or a missing key in the default `required` mode
+fails startup. Never publish the unauthenticated MCP port to the host or a
+public network.
+
 ### 🔧 Local Installation
 ```bash
 git clone https://github.com/twjackysu/TWStockMCPServer.git
