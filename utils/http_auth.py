@@ -6,6 +6,7 @@ import os
 import secrets
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import override
 
 from fastmcp.server.auth import AccessToken, TokenVerifier
@@ -13,6 +14,29 @@ from fastmcp.server.auth import AccessToken, TokenVerifier
 
 class HTTPAuthConfigurationError(RuntimeError):
     """Raised when HTTP authentication is not safely configured."""
+
+
+class HTTPAuthMode(StrEnum):
+    """Supported authentication modes for MCP HTTP transports."""
+
+    REQUIRED = "required"
+    NONE = "none"
+
+    @classmethod
+    def from_environment(cls, environ: Mapping[str, str] | None = None) -> HTTPAuthMode:
+        """Load the explicit HTTP authentication mode, defaulting securely."""
+        environment = os.environ if environ is None else environ
+        configured_mode = environment.get("MCP_HTTP_AUTH_MODE")
+        if configured_mode is None:
+            return cls.REQUIRED
+
+        normalized_mode = configured_mode.strip().lower()
+        try:
+            return cls(normalized_mode)
+        except ValueError as exc:
+            raise HTTPAuthConfigurationError(
+                "MCP_HTTP_AUTH_MODE must be either 'required' or 'none'"
+            ) from exc
 
 
 @dataclass(frozen=True)
@@ -85,4 +109,5 @@ __all__ = [
     "APIKeyAuthConfig",
     "APIKeyTokenVerifier",
     "HTTPAuthConfigurationError",
+    "HTTPAuthMode",
 ]

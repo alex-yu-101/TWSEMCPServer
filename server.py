@@ -25,7 +25,7 @@ from prompts.taifex_derivatives_prompt import taifex_derivatives_prompt
 from prompts.twse_stock_trend_prompt import twse_stock_trend_prompt
 from tools import register_all_tools
 from utils.api_client import TWSEAPIClient
-from utils.http_auth import APIKeyTokenVerifier
+from utils.http_auth import APIKeyTokenVerifier, HTTPAuthMode
 
 # Configure logging (similar to .NET ILogger)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -35,15 +35,22 @@ logger = logging.getLogger(__name__)
 class TWSEFastMCP(FastMCP):
     """FastMCP server that also secures HTTP runs started through the CLI."""
 
-    auth: APIKeyTokenVerifier
-    _http_api_key_auth_configured: bool = False
+    auth: APIKeyTokenVerifier | None
+    _http_auth_configured: bool = False
 
     def configure_http_auth(
         self, environ: Mapping[str, str] | None = None
     ) -> None:
-        """Attach environment-managed API-key auth to HTTP transports."""
-        self.auth = APIKeyTokenVerifier.from_environment(environ)
-        self._http_api_key_auth_configured = True
+        """Apply the explicitly configured authentication mode to HTTP."""
+        mode = HTTPAuthMode.from_environment(environ)
+        if mode is HTTPAuthMode.NONE:
+            self.auth = None
+            logger.warning(
+                "MCP HTTP authentication is disabled; use only on a trusted private network"
+            )
+        else:
+            self.auth = APIKeyTokenVerifier.from_environment(environ)
+        self._http_auth_configured = True
 
     @override
     async def run_async(
@@ -54,7 +61,7 @@ class TWSEFastMCP(FastMCP):
     ) -> None:
         if (
             transport in {"http", "streamable-http", "sse"}
-            and not self._http_api_key_auth_configured
+            and not self._http_auth_configured
         ):
             self.configure_http_auth()
         await super().run_async(

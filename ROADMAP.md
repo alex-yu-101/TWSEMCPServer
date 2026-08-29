@@ -58,7 +58,7 @@ must not publish the MCP port to the host or public network.
 | Add authentication and transport tests | High | Done | Authentication middleware | [#1](https://github.com/alex-yu-101/TWSEMCPServer/pull/1) |
 | Containerize the FastMCP service | High | Done | Authentication configuration | [#2](https://github.com/alex-yu-101/TWSEMCPServer/pull/2) |
 | Add container deployment and key-rotation documentation | High | Done | Containerization | [#2](https://github.com/alex-yu-101/TWSEMCPServer/pull/2) |
-| Add opt-in unauthenticated HTTP for private container networks | Medium | Approved | Containerization | — |
+| Add opt-in unauthenticated HTTP for private container networks | Medium | In progress | Containerization | `feat/optional-http-auth` |
 | Add structured security-event logging | Medium | Proposed | Authentication middleware | — |
 | Add configurable rate limiting | Medium | Deferred | Authentication middleware | — |
 | Add database-backed, per-client API keys | Low | Deferred | Demonstrated multi-client need | — |
