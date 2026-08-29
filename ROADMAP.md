@@ -30,7 +30,7 @@ Priorities:
 The first deployment will remain backend-only. It will not include an
 administrator dashboard, user accounts, or a database-backed API-key registry.
 
-Public HTTP requests will follow this path:
+Authenticated public HTTP requests follow this path by default:
 
 ```text
 MCP client -> HTTPS endpoint -> bearer-key middleware -> FastMCP server
@@ -44,16 +44,21 @@ restart.
 Local `stdio` transport will remain available for trusted local use and will
 not pass through HTTP authentication middleware.
 
+A separate, explicit opt-in may allow unauthenticated HTTP for private
+container-network deployments. That mode must remain disabled by default and
+must not publish the MCP port to the host or public network.
+
 ## Improvement backlog
 
 | Improvement | Priority | Status | Dependencies | Branch / PR |
 | --- | --- | --- | --- | --- |
-| Document the backend-only deployment architecture | High | Approved | None | — |
-| Add environment-managed bearer-key configuration | High | Approved | None | — |
-| Add bearer-key middleware for HTTP transport | High | Approved | Key configuration | — |
-| Add authentication and transport tests | High | Approved | Authentication middleware | — |
-| Containerize the FastMCP service | High | Approved | Authentication configuration | — |
-| Add container deployment and key-rotation documentation | High | Approved | Containerization | — |
+| Document the backend-only deployment architecture | High | Done | None | [#1](https://github.com/alex-yu-101/TWSEMCPServer/pull/1), [#2](https://github.com/alex-yu-101/TWSEMCPServer/pull/2) |
+| Add environment-managed bearer-key configuration | High | Done | None | [#1](https://github.com/alex-yu-101/TWSEMCPServer/pull/1) |
+| Add bearer-key middleware for HTTP transport | High | Done | Key configuration | [#1](https://github.com/alex-yu-101/TWSEMCPServer/pull/1) |
+| Add authentication and transport tests | High | Done | Authentication middleware | [#1](https://github.com/alex-yu-101/TWSEMCPServer/pull/1) |
+| Containerize the FastMCP service | High | Done | Authentication configuration | [#2](https://github.com/alex-yu-101/TWSEMCPServer/pull/2) |
+| Add container deployment and key-rotation documentation | High | Done | Containerization | [#2](https://github.com/alex-yu-101/TWSEMCPServer/pull/2) |
+| Add opt-in unauthenticated HTTP for private container networks | Medium | Approved | Containerization | — |
 | Add structured security-event logging | Medium | Proposed | Authentication middleware | — |
 | Add configurable rate limiting | Medium | Deferred | Authentication middleware | — |
 | Add database-backed, per-client API keys | Low | Deferred | Demonstrated multi-client need | — |
@@ -93,6 +98,19 @@ credentials should receive the same generic `401 Unauthorized` response.
 
 Local `stdio` transport is outside this middleware path and should remain
 unaffected.
+
+### Private-network unauthenticated HTTP
+
+Support an explicit configuration option that disables HTTP bearer
+authentication only for trusted private-network deployments. Authentication
+must remain the default, and missing authentication configuration must continue
+to fail closed unless the operator deliberately selects unauthenticated mode.
+
+The documented Docker Compose example must keep the MCP port un-published and
+connect clients through a named Docker network. Tests must cover the secure
+default, explicit opt-in behavior, invalid configuration, and unchanged stdio
+operation. The server should log that unauthenticated HTTP mode is active
+without logging secrets.
 
 ### Tests and documentation
 
